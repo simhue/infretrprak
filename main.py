@@ -29,8 +29,9 @@ def createSentenceVector(wordVectors):
     from collections import defaultdict
     result = defaultdict(set)
     for sentenceId in wordVectors.keys():
-        for wordId in wordVectors[sentenceId]:
-            result[wordId].add(sentenceId)
+	if len(wordVectors[sentenceId]) >= 5:
+	        for wordId in wordVectors[sentenceId]:
+        	    result[wordId].add(sentenceId)
     return result
 
 def createSentencePair(sentenceVectors):
@@ -84,7 +85,7 @@ def saveSentencePairs(sentencePairs, dbConn, fileName):
 def run(limit, fileName):
 	print("Run with " + str(limit) + " sentences")
 	t1 = clock()
-	query = "SELECT distinct s1.s_id, w.w_id FROM sentences AS s1 INNER JOIN inv_w AS i ON s1.s_id = i.s_id INNER JOIN words AS w ON i.w_id = w.w_id AND w.w_id >= " + str(wordIdBoundary) + " limit " + str(limit)
+	query = "SELECT s1.s_id, w.w_id FROM sentences AS s1 INNER JOIN inv_w AS i ON s1.s_id = i.s_id INNER JOIN words AS w ON i.w_id = w.w_id AND w.w_id >= " + str(wordIdBoundary) + " limit " + str(limit)
 	print(query)
 	c1 = db.cursor()
 	c1.execute(query)
@@ -92,13 +93,13 @@ def run(limit, fileName):
 	c1.close()
 	print("Count WordVectors: "+ str(len(wordVectors)))
 	sentenceVectors = createSentenceVector(wordVectors)
-#	del wordVectors[:]
+	wordVectors.clear()
 	print("Count sentenceVectors: "+ str(len(sentenceVectors)))
 	sentencePair = createSentencePair(sentenceVectors)
-#	del sentenceVectors[:]
+	sentenceVectors.clear()
 	print("Count sentencePair: "+ str(len(sentencePair)))
 	similarSentences = countSentences(sentencePair)
-#	del sentencePair[:]
+	del sentencePair[:]
 	print("Count similarSentences: "+ str(len(similarSentences)))
 	t2 = clock()
 	print(str(t2 - t1))
@@ -108,4 +109,5 @@ run(1000, "1k.txt")
 run(10000, "10k.txt")
 run(100000, "100k.txt")
 run(1000000, "1M.txt")
-#run(10000000, "10M.txt")
+run(10000000, "10M.txt")
+run(1000000000, "1Mrd.txt")
