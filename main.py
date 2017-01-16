@@ -4,14 +4,14 @@ import MySQLdb
 import sys
 from time import *
 # DB connect information
-host = ''
-user = ''
-passwd = ''
-db = ''
+host = 'aspra18.informatik.uni-leipzig.de'
+user = 'ir2016-gruppe8'
+passwd = '3SqnuPbAW9'
+db = 'deu_newscrawl_2011'
 
 # config
 wordIdBoundary = 10000
-minCountOfWords = 10
+minCountOfWords = 5
 
 # create db connection
 db = MySQLdb.connect(host = host,
@@ -39,19 +39,32 @@ def createSentenceVector(wordVectors):
        	    		result[wordId].add(sentenceId)
 #			print(result[wordId])
 	return result
+	#save sentence vectors as json
+#	import json
+#	with open("sentenceVectors", "w") as file:
+#		for wordId in result.keys():
+#			if len(result[wordId]) > 1:
+#				json.dump({wordId: list(result[wordId])}, file)
+#				file.write("\n")
 
 def createSentencePair(sentenceVectors):
+	import json
 	pair = []
-	for sentences in sentenceVectors.values():
-		if(len(sentences)>1):
-			#print(sentences)
-			dummySet = sentences.copy()
-			while(1 < len(dummySet)):
-				sentence1 = dummySet.pop()
-				for sentence2 in dummySet:
-					pair.append(str(sentence1) + ':' + str(sentence2))
-	pair.sort()
-	return pair
+	with open("pairs", "w") as svFile:
+		for sentences in sentenceVectors.values():
+			if(len(sentences)>1):
+				dummySet = sentences.copy()
+				while(1 < len(dummySet)):
+					sentence1 = dummySet.pop()
+					for sentence2 in dummySet:
+						if sentence1 < sentence2:
+							svFile.write(str(sentence1) + " " + str(sentence2) + "\n")
+						else:
+							svFile.write(str(sentence2) + " " + str(sentence1) + "\n")
+					
+					#pair.append(str(sentence1) + ':' + str(sentence2))
+#	pair.sort()
+#	return pair
 
 def countSentences(sentencePair):
 	result = []
@@ -103,18 +116,18 @@ def run(limit, fileName):
 	wordVectors.clear()
 	print("Count sentenceVectors: "+ str(len(sentenceVectors)))
 	sentencePair = createSentencePair(sentenceVectors)
-	sentenceVectors.clear()
-	print("Count sentencePair: "+ str(len(sentencePair)))
-	similarSentences = countSentences(sentencePair)
-	del sentencePair[:]
-	print("Count similarSentences: "+ str(len(similarSentences)))
+#	sentenceVectors.clear()
+#	print("Count sentencePair: "+ str(len(sentencePair)))
+#	similarSentences = countSentences(sentencePair)
+#	del sentencePair[:]
+#	print("Count similarSentences: "+ str(len(similarSentences)))
 	t2 = clock()
 	print(str(t2 - t1))
-	saveSentencePairs(similarSentences, db, fileName)
+#	saveSentencePairs(similarSentences, db, fileName)
 
-run(1000, "1k.txt")
-run(10000, "10k.txt")
-run(100000, "100k.txt")
-run(1000000, "1M.txt")
+#run(1000, "1k.txt")
+#run(10000, "10k.txt")
+#run(100000, "100k.txt")
+#run(1000000, "1M.txt")
 run(10000000, "10M.txt")
 #run(1000000000, "1Mrd.txt")
