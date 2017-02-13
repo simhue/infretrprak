@@ -5,10 +5,10 @@ import MySQLdb.cursors
 import sys
 from time import *
 # DB connect information
-host = 'aspra18.informatik.uni-leipzig.de'
-user = 'ir2016-gruppe8'
-passwd = '3SqnuPbAW9'
-db = 'deu_mixed_2011'
+host = ''
+user = ''
+passwd = ''
+db = ''
 
 # config
 wordIdBoundary = 10000
@@ -78,6 +78,7 @@ def createSentenceVectors():
 				if not wIdAlreadyExists:
 					with open("sentencevectors", "a") as svFile:
 						svFile.write(str({"key": wId, "items": [wordVector["key"]]}) + "\n")
+	os.remove("wordvectors")
 
 def createSentencePairs():
 	print("Create sentence pairs")
@@ -96,23 +97,26 @@ def createSentencePairs():
 						pairsFile.write(str(sentence1) + " " + str(sentence2) + "\n")
 					else:
 						pairsFile.write(str(sentence2) + " " + str(sentence1) + "\n")
+	os.remove("sentencevectors")
 					
-def saveSentencePairs(sentencePairs, dbConn, fileName):
-	cursor = dbConn.cursor();
-	newFile = open(fileName, "w")
-	for sentencePair in sentencePairs:
-		sid1, sid2 = sentencePair.split(":")
-		query1 = "select sentence from sentences where s_id = " + str(sid1)
-		query2 = "select sentence from sentences where s_id = " + str(sid2)
-		cursor.execute(query1)
-		s1 = cursor.fetchone()
-		cursor.execute(query2)
-		s2 = cursor.fetchone()
-		newFile.write(str(sid1) + ":\t" + str(s1) + "\n")
-		newFile.write(str(sid2) + ":\t" + str(s2) + "\n")
-		newFile.write("------------------\n")
-	cursor.close()
-	newFile.close()
+def saveSentencePairs(dbConn, fileName):
+	with open(fileName, "w") as newFile, open("sorted-counted-pairs", "r+") as pairsFile:
+		for line in pairsFile:
+			sid1, sid2 = line.strip().split(" ")[1:]
+			query1 = "select sentence from sentences where s_id = " + str(sid1)
+			query2 = "select sentence from sentences where s_id = " + str(sid2)
+			cursor = dbConn.cursor()
+			cursor.execute(query1)
+			s1 = cursor.fetchone()
+			cursor.close()
+			cursor = dbConn.cursor()
+			cursor.execute(query2)
+			s2 = cursor.fetchone()
+			cursor.close()
+			newFile.write(str(sid1) + ":\t" + str(s1) + "\n")
+			newFile.write(str(sid2) + ":\t" + str(s2) + "\n")
+			newFile.write("------------------\n")
+
 
 if __name__ == "__main__":
 	import os.path
@@ -132,6 +136,5 @@ if __name__ == "__main__":
 		createWordVectors(export)
 		createSentenceVectors()
 		createSentencePairs()
-		sentenceVectors.clear()
-#	saveSentencePairs(similarSentences, db, fileName)
+#	saveSentencePairs(db, "sentences.txt")
 
