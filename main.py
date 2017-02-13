@@ -1,5 +1,6 @@
 
 import MySQLdb
+import MySQLdb.cursors
 
 import sys
 from time import *
@@ -7,7 +8,7 @@ from time import *
 host = 'aspra18.informatik.uni-leipzig.de'
 user = 'ir2016-gruppe8'
 passwd = '3SqnuPbAW9'
-db = 'deu_newscrawl_2011'
+db = 'deu_mixed_2011'
 
 # config
 wordIdBoundary = 10000
@@ -17,73 +18,85 @@ minCountOfWords = 5
 db = MySQLdb.connect(host = host,
                     user = user,
                     passwd = passwd,
-                    db = db)
+                    db = db,
+		    cursorclass = MySQLdb.cursors.SSCursor)
 
-def createWordVector(col):
+def createWordVectors(inputFile):
+	print("Creating word vector")
 	import bisect
-	from collections import defaultdict
-	result = defaultdict(list)
-	for row in col:
-		bisect.insort(result[row[0]], row[1])
-		# delete the first item if length of list is greater than minCountOfWords
-		if len(result[row[0]]) > minCountOfWords:
-			del result[row[0]][0]
-#		print(result[row[0]])
-	return result
+	import fileinput
+	#simply create new file without adding something
+	open("wordvectors", "a").close()
+	progress = 0
+	for inputLine in inputFile:
+		if progress % 1000 == 0:
+			print str(progress)
+		progress += 1
+		sId, wId = eval(inputLine.replace("\n", ""))	
+		if wId <= 87839:
+			continue
+		sIdAlreadyExists = False
+		vector = {}
+		wordVectorFile = fileinput.input(files=("wordvectors"), inplace=True)
+		for wvLine in wordVectorFile:
+			#apply changes to current line in wordVectorFile
+			vector = eval(wvLine.replace("\n", ""))
+			if vector["key"] == sId:
+				sIdAlreadyExists = True
+				bisect.insort(vector["items"], wId)
+			# delete the first item if length of list is greater than minCountOfWords
+			if len(vector["items"]) > minCountOfWords:
+				del vector["items"][0]
+			#write line back to file
+			print str(vector) + "\n",
+		wordVectorFile.close()
+		# if s_id is not yet processed, append new line to file
+		if not sIdAlreadyExists:
+			with open("wordvectors", "a") as file:
+				file.write(str({"key": sId, "items": [wId]}) + "\n")			
 
-def createSentenceVector(wordVectors):
+def createSentenceVectors():
+	print("Creating sentence vector")
 	from collections import defaultdict
-	result = defaultdict(set)
-	for sentenceId in wordVectors.keys():
-		for wordId in wordVectors[sentenceId]:
-       	    		result[wordId].add(sentenceId)
-#			print(result[wordId])
-	return result
-	#save sentence vectors as json
-#	import json
-#	with open("sentenceVectors", "w") as file:
-#		for wordId in result.keys():
-#			if len(result[wordId]) > 1:
-#				json.dump({wordId: list(result[wordId])}, file)
-#				file.write("\n")
+	import fileinput
+	with open("wordvectors", "r+") as file:
+		open("sentencevectors", "a").close()		
+		for line in file: 
+			wordVector = eval(line.replace("\n", ""))
+			if len(wordVector["items"]) <= 1:
+				continue
+			for wId in wordVector["items"]:
+				sentenceVectorFile = fileinput.input(files=("sentencevectors"), inplace=True)
+				wIdAlreadyExists = False
+				for svLine in sentenceVectorFile:
+					sentenceVector = eval(svLine.replace("\n", ""))
+					if sentenceVector["key"] == wId:
+						wIdAlreadyExists = True
+						sentenceVector["items"].append(wordVector["key"])
+					print str(sentenceVector) + "\n", 
+				sentenceVectorFile.close()
+				if not wIdAlreadyExists:
+					with open("sentencevectors", "a") as svFile:
+						svFile.write(str({"key": wId, "items": [wordVector["key"]]}) + "\n")
 
-def createSentencePair(sentenceVectors):
+def createSentencePairs():
+	print("Create sentence pairs")
 	import json
 	pair = []
-	with open("pairs", "w") as svFile:
-		for sentences in sentenceVectors.values():
-			if(len(sentences)>1):
-				dummySet = sentences.copy()
-				while(1 < len(dummySet)):
-					sentence1 = dummySet.pop()
-					for sentence2 in dummySet:
-						if sentence1 < sentence2:
-							svFile.write(str(sentence1) + " " + str(sentence2) + "\n")
-						else:
-							svFile.write(str(sentence2) + " " + str(sentence1) + "\n")
+	with open("pairs", "w") as pairsFile, open("sentencevectors", "r") as svFile:
+		for line in svFile:
+			sentences = eval(line.replace("\n", ""))["items"]
+			if len(sentences) <= 1:
+				continue
+			dummySet = list(sentences)
+			while(1 < len(dummySet)):
+				sentence1 = dummySet.pop()
+				for sentence2 in dummySet:
+					if sentence1 < sentence2:
+						pairsFile.write(str(sentence1) + " " + str(sentence2) + "\n")
+					else:
+						pairsFile.write(str(sentence2) + " " + str(sentence1) + "\n")
 					
-					#pair.append(str(sentence1) + ':' + str(sentence2))
-#	pair.sort()
-#	return pair
-
-def countSentences(sentencePair):
-	result = []
-	minCommonWords = 5
-	countCommonWords = 0
-	i = 0
-	currentPair = sentencePair[i]
-	i = i + 1
-	while(i<len(sentencePair)):
-		if(currentPair == sentencePair[i]):
-			countCommonWords = countCommonWords + 1
-		else:
-			if(countCommonWords > minCommonWords):
-				result.append(currentPair)
-			currentPair = sentencePair[i]
-			countCommonWords = 0
-		i = i + 1
-	return result
-
 def saveSentencePairs(sentencePairs, dbConn, fileName):
 	cursor = dbConn.cursor();
 	newFile = open(fileName, "w")
@@ -101,33 +114,24 @@ def saveSentencePairs(sentencePairs, dbConn, fileName):
 	cursor.close()
 	newFile.close()
 
-def run(limit, fileName):
-	print("Run with " + str(limit) + " sentences")
-	t1 = clock()
-#	query = "SELECT s1.s_id, w.w_id FROM sentences AS s1 INNER JOIN inv_w AS i ON s1.s_id = i.s_id INNER JOIN words AS w ON i.w_id = w.w_id AND w.w_id >= " + str(wordIdBoundary) + " limit " + str(limit)
-	query = "SELECT s_id, w_id FROM inv_w limit " + str(limit)
-	print(query)
-	c1 = db.cursor()
-	c1.execute(query)
-	wordVectors = createWordVector(c1.fetchall())
-	c1.close()
-	print("Count WordVectors: "+ str(len(wordVectors)))
-	sentenceVectors = createSentenceVector(wordVectors)
-	wordVectors.clear()
-	print("Count sentenceVectors: "+ str(len(sentenceVectors)))
-	sentencePair = createSentencePair(sentenceVectors)
-#	sentenceVectors.clear()
-#	print("Count sentencePair: "+ str(len(sentencePair)))
-#	similarSentences = countSentences(sentencePair)
-#	del sentencePair[:]
-#	print("Count similarSentences: "+ str(len(similarSentences)))
-	t2 = clock()
-	print(str(t2 - t1))
+if __name__ == "__main__":
+	import os.path
+	fileName = "test.txt"
+	if not os.path.isfile(fileName):
+		print("Exporting s_id, w_id from inv_w...")
+		query = "SELECT s_id, w_id FROM inv_w"
+		c1 = db.cursor()
+		c1.execute(query)
+		with open(fileName, "w") as export:
+			row = c1.fetchone()
+			while row is not None:
+				export.write(str(row) + "\n")
+				row = c1.fetchone()
+		c1.close()
+	with open(fileName, "r+") as export:
+		createWordVectors(export)
+		createSentenceVectors()
+		createSentencePairs()
+		sentenceVectors.clear()
 #	saveSentencePairs(similarSentences, db, fileName)
 
-#run(1000, "1k.txt")
-#run(10000, "10k.txt")
-#run(100000, "100k.txt")
-#run(1000000, "1M.txt")
-run(10000000, "10M.txt")
-#run(1000000000, "1Mrd.txt")
