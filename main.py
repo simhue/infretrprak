@@ -4,102 +4,108 @@ import MySQLdb.cursors
 
 import sys
 from time import *
-# DB connect information
-host = ''
-user = ''
-passwd = ''
-db = ''
+# DB connection information
+# DB host
+host = 'localhost'
+# DB user
+user = 'dbuser'
+# DB password
+passwd = 'password'
+# Name of used DB
+dbName = 'deu_mixed_2011'
 
 # config
-wordIdBoundary = 10000
-minCountOfWords = 5
+# every word id less or equal this value will be ignored
+wordIdBoundary = 87839
+# size of length of every word vector
+countOfWords = 5
+# number of sentences to process, -1 indicates to process all sentences in export file
+countOfSentences = -1
 
 # create db connection
 db = MySQLdb.connect(host = host,
                     user = user,
                     passwd = passwd,
-                    db = db,
+                    db = dbName,
 		    cursorclass = MySQLdb.cursors.SSCursor)
 
-def createWordVectors(inputFile):
+def createWordVectors(inputFile, countOfSentences):
 	print("Creating word vector")
 	import bisect
 	import fileinput
-	#simply create new file without adding something
-	open("wordvectors", "a").close()
-	progress = 0
-	for inputLine in inputFile:
-		if progress % 1000 == 0:
-			print str(progress)
-		progress += 1
-		sId, wId = eval(inputLine.replace("\n", ""))	
-		if wId <= 87839:
-			continue
-		sIdAlreadyExists = False
-		vector = {}
-		wordVectorFile = fileinput.input(files=("wordvectors"), inplace=True)
-		for wvLine in wordVectorFile:
-			#apply changes to current line in wordVectorFile
-			vector = eval(wvLine.replace("\n", ""))
-			if vector["key"] == sId:
-				sIdAlreadyExists = True
+	
+	with open("wordvectors", "w") as file:
+		# init vector
+		vector = {"key": -1, "items": []}
+		for inputLine in inputFile:
+			if countOfSentences == 0:
+				break
+			sId, wId = eval(inputLine.replace("\n", ""))	
+			# ignore top words
+			if wId <= wordIdBoundary:
+				continue
+			if vector["key"] == -1: #first wordvector
+				vector["key"] = sId
+				vector["items"] = [wId]
+			elif sId == vector["key"]: 
+				# insert new wId in ascending order
 				bisect.insort(vector["items"], wId)
-			# delete the first item if length of list is greater than minCountOfWords
-			if len(vector["items"]) > minCountOfWords:
-				del vector["items"][0]
-			#write line back to file
-			print str(vector) + "\n",
-		wordVectorFile.close()
-		# if s_id is not yet processed, append new line to file
-		if not sIdAlreadyExists:
-			with open("wordvectors", "a") as file:
-				file.write(str({"key": sId, "items": [wId]}) + "\n")			
+				# delete the first item if length of list is greater than countOfWord
+				if len(vector["items"]) > countOfWords:
+					del vector["items"][0]
+			else:
+				if len(vector["items"]) == countOfWords:
+	                                file.write(str(vector) + "\n")
+				vector["key"] = sId
+				vector["items"] = [wId]
+				countOfSentences -= 1
 
 def createSentenceVectors():
 	print("Creating sentence vector")
-	from collections import defaultdict
 	import fileinput
 	with open("wordvectors", "r+") as file:
-		open("sentencevectors", "a").close()		
+		open("sentencevectors", "w").close()		
 		for line in file: 
 			wordVector = eval(line.replace("\n", ""))
-			if len(wordVector["items"]) <= 1:
-				continue
-			for wId in wordVector["items"]:
-				sentenceVectorFile = fileinput.input(files=("sentencevectors"), inplace=True)
-				wIdAlreadyExists = False
-				for svLine in sentenceVectorFile:
-					sentenceVector = eval(svLine.replace("\n", ""))
-					if sentenceVector["key"] == wId:
-						wIdAlreadyExists = True
-						sentenceVector["items"].append(wordVector["key"])
-					print str(sentenceVector) + "\n", 
-				sentenceVectorFile.close()
-				if not wIdAlreadyExists:
-					with open("sentencevectors", "a") as svFile:
+			# change sentencevector file in place
+			sentenceVectorFile = fileinput.input(files=("sentencevectors"), inplace=True)
+			for svLine in sentenceVectorFile:
+				sentenceVector = eval(svLine.replace("\n", ""))
+				# if sentenceVector["key"] is in wordVector["items"]
+				# append new sId to sentenceVector and remove old wId from wordVector
+				if sentenceVector["key"] in wordVector["items"]:
+					sentenceVector["items"].append(wordVector["key"])
+					wordVector["items"].remove(sentenceVector["key"])
+				# write back to file
+				print str(sentenceVector) + "\n", 
+			sentenceVectorFile.close()
+			# if every item in wordVector["items"] was found in sentenceVectorFile
+			# creating new sentenceVectors is not necessary
+			if len(wordVector["items"]) > 0:
+				with open("sentencevectors", "a") as svFile:
+					for wId in wordVector["items"]:
 						svFile.write(str({"key": wId, "items": [wordVector["key"]]}) + "\n")
 	os.remove("wordvectors")
 
 def createSentencePairs():
 	print("Create sentence pairs")
-	import json
-	pair = []
 	with open("pairs", "w") as pairsFile, open("sentencevectors", "r") as svFile:
 		for line in svFile:
 			sentences = eval(line.replace("\n", ""))["items"]
-			if len(sentences) <= 1:
-				continue
+			# copy current sentence vector			
 			dummySet = list(sentences)
+			# pair every sId with every other sId in this sentenceVector
 			while(1 < len(dummySet)):
 				sentence1 = dummySet.pop()
 				for sentence2 in dummySet:
+					# save new found pair in ascending order
 					if sentence1 < sentence2:
 						pairsFile.write(str(sentence1) + " " + str(sentence2) + "\n")
 					else:
 						pairsFile.write(str(sentence2) + " " + str(sentence1) + "\n")
 	os.remove("sentencevectors")
 					
-def saveSentencePairs(dbConn, fileName):
+def getSentences(dbConn, fileName):
 	with open(fileName, "w") as newFile, open("sorted-counted-pairs", "r+") as pairsFile:
 		for line in pairsFile:
 			sid1, sid2 = line.strip().split(" ")[1:]
@@ -120,7 +126,8 @@ def saveSentencePairs(dbConn, fileName):
 
 if __name__ == "__main__":
 	import os.path
-	fileName = "test.txt"
+	fileName = dbName
+	# if file not exists get inverse list from database and sort file
 	if not os.path.isfile(fileName):
 		print("Exporting s_id, w_id from inv_w...")
 		query = "SELECT s_id, w_id FROM inv_w"
@@ -132,9 +139,13 @@ if __name__ == "__main__":
 				export.write(str(row) + "\n")
 				row = c1.fetchone()
 		c1.close()
+		# sort export file in ascending order
+		import subprocess
+		import shutil
+		subprocess.call(["sort", "--parallel=3", "-o", "temp", fileName])
+		shutil.move("temp", fileName)
 	with open(fileName, "r+") as export:
-		createWordVectors(export)
-		createSentenceVectors()
-		createSentencePairs()
-#	saveSentencePairs(db, "sentences.txt")
+		createWordVectors(export, countOfSentences)
+	createSentenceVectors()
+	createSentencePairs()
 
