@@ -5,4 +5,4 @@ cat sorted-pairs | uniq -d -c > counted-pairs
 rm sorted-pairs
 sort --parallel=3 -o sorted-counted-pairs counted-pairs
 rm counted-pairs
-python -c "import main; main.saveSentencePairs(main.db, 'sentences.txt')"
+python -c "import main; main.getSentences(main.db, 'sentences.txt')"
