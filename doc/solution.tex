@@ -646,7 +646,7 @@ SELECT s_id, w_id FROM inv_w;
 \end{tikzpicture}
 }
 \end{figure}
-Ein Wortvektor ist eine Liste von Wort-IDs, die in Relation zu einer Satz-ID stehen. Da im vorhergehenden Schritt die Exportdatei sortiert wird, kann in einem Arbeitsschritt sukzessiv jedes Satz-Wort-ID-Paar mit gleicher Satz-ID ausgelesen und formatiert werden. Nachdem der Erstellung eines Wortvektors speichert das Programm diesen im Format \texttt{\{"key": s\_id, "items":[w\_id\_1, \dots, w\_id\_n]\}} in einer temporäre Auslagerungsdatei ab. Die sortierte Exportdatei bietet den weiteren Vorteil, dass neue Wortvektoren an die Datei angehängt werden können. Das sorgt für eine vergleichsweise schnelle Teillaufzeit.
+Ein Wortvektor ist eine Liste von Wort-IDs, die in Relation zu einer Satz-ID stehen. Da im vorhergehenden Schritt die Exportdatei sortiert wird, kann in einem Arbeitsschritt sukzessiv jedes Satz-Wort-ID-Paar mit gleicher Satz-ID ausgelesen und formatiert werden. Nachdem der Erstellung eines Wortvektors speichert das Programm diesen im Format \texttt{\{'key': s\_id, 'items':[w\_id\_1, \dots, w\_id\_n]\}} in einer temporäre Auslagerungsdatei ab. Die sortierte Exportdatei bietet den weiteren Vorteil, dass neue Wortvektoren an die Datei angehängt werden können. Das sorgt für eine vergleichsweise schnelle Teillaufzeit.
 
 \subsection{Satzvektor erstellen}
 \begin{figure}[!h]
@@ -1064,7 +1064,7 @@ Ein Wortvektor ist eine Liste von Wort-IDs, die in Relation zu einer Satz-ID ste
 }
 \end{figure}
 
-Um Satzpaare bilden zu können, sind Satzvektoren nötig. Satzvektoren sind Listen von Satz-IDs, die mit einer gemeinsamen Wort-ID in Relation stehen. Die Wortvektordatei wird zeilenweise ausgelesen und in Satzvektoren formatiert. Die Satzvektoren werden im Format \texttt{\{"key": w\_id, "items":[s\_id\_1, \dots, s\_id\_n]\}} in eine weitere temporäre Datei ausgelagert. Für jeden neuen Wortvektor ist es nötig, die temporäre Datei erneut durch zu iterieren. Dadurch wird überprüft, ob eine Wort-ID schon vorkam. Für den positiven Fall wird der entsprechenden Satzvektor mit der Satz-ID des Wortvektors erweitert. Im negativen Fall wird ein neuer Satzvektor erzeugt und der Satzvektordatei angefügt. Das wiederholte Iterieren der Auslagerungsdatei ist zeitintensiv. 
+Um Satzpaare bilden zu können, sind Satzvektoren nötig. Satzvektoren sind Listen von Satz-IDs, die mit einer gemeinsamen Wort-ID in Relation stehen. Die Wortvektordatei wird zeilenweise ausgelesen und in Satzvektoren formatiert. Die Satzvektoren werden im Format \texttt{\{'key': w\_id, 'items':[s\_id\_1, \dots, s\_id\_n]\}} in eine weitere temporäre Datei ausgelagert. Für jeden neuen Wortvektor ist es nötig, die temporäre Datei erneut durch zu iterieren. Dadurch wird überprüft, ob eine Wort-ID schon vorkam. Für den positiven Fall wird der entsprechenden Satzvektor mit der Satz-ID des Wortvektors erweitert. Im negativen Fall wird ein neuer Satzvektor erzeugt und der Satzvektordatei angefügt. Das wiederholte Iterieren der Auslagerungsdatei ist zeitintensiv. 
 
 Um die Laufzeit zu minimieren wäre es denkbar für jeden Satzvektor eine eigene temporäre Datei zu erzeugen. Der Name der Datei enthält die Wort-ID und der Inhalt der Datei sind die entsprechenden Satz-IDs. Dadurch werden die Dateigrößen und die Lese-/Schreibzeiten klein gehalten. Dieser Ansatz könnte jedoch durch die \emph{Inodes} des Linuxsystems limitiert sein, da die Anzahl der Inodes auf einem System begrenzt ist und die Anzahl der Sätze, die verglichen werden sollen, nicht vorhersagbar ist. Wenn dieser Schritt vollendet ist, wird die jetzt obsolete Wortvektordatei gelöscht.
 
@@ -1074,4 +1074,30 @@ Für jedes Satzvektor wird jede Satz-ID mit jeder übrigen Satz-ID gepaart und i
 \subsection{Satzpaare sortieren und Duplikate zählen}
 Zur Sortierung und Zählung der Paare stellt Linux systemeigene Befehle zur Verfügung. \texttt{sort --parallel=3 -o sorted-pairs pairs} sortiert zeilenweise die Satzpaare aufsteigend. Zur schnelleren Sortierung kann mit \texttt{--parallel=$n$} die Sortierung auf $n$ Prozessorkerne (in diesem Fall drei Kerne) verteilt werden. \texttt{uniq -d -c} zählt die doppelten Paare und entfernt einzeln vorkommende Satzpaare. Anschließend sortiert ein erneuter \texttt{sort}-Aufruf die Zählungen der Aanzahl der Dopplungen nach und gibt alles in die Datei \texttt{sorted-counted-pairs} aus. Als letzter Schritt werden für jedes Paar mittels SQL-Abfrage der eigentliche Sätze als Klartext aus der Datenbank gelesen und in der Datei \texttt{sentences.txt} abgespeichert.
 
+\section{Ergebnisse}
+Der Algorithmus funktioniert und liefert wie gewünscht sehr ähnliche Sätze. Aufgrund der langen Laufzeit wurden vorerst nur die Ergebnisse der ersten 10.000 Sätze ausgewertet. Als Flaschenhals stellte sich hierbei die begrenzte Lese- und Schreibgeschwindigkeit der Festplatte heraus. Die Erstellung der Satzvektoren benötigt die meiste Zeit. 
+
+Insgesamt wurden in den 10.000 Sätzen 19 semantisch ähnliche Sätze gefunden. Auffällig war hierbei, dass die durchschnittliche Länge der gefundenen Sätze bei 26 Wörtern liegt. Der längste Satz in der Ergebnismenge enthält 34 Wörter, der kürzeste 18 Wörter.  Hieraus kann man schlussfolgern, dass der Algorithmus vor allem für lange Sätze gut funktioniert. Ein großer Teil der gefundenen ähnlichen Sätze unterscheiden sich entweder nur in wenigen Wörtern oder sie sind identisch und einer der beiden Sätze enthält einen weiteren (unterschiedlichen) Teilsatz. So zum Beispiel diese beiden Sätze:
+
+"Die Zivilklage sei an einem Bundesbezirksgericht in Washington im Namen von 144 Hinterbliebenen eingereicht worden, sagte Menschenrechtsanwalt Terry Collingsworth von der Gruppe International Rights Advocates der Nachrichtenagentur Reuters \textbf{am Donnerstag}."
+
+„Die Zivilklage sei an einem Bundesbezirksgericht in Washington im Namen von 174 Hinterbliebenen eingereicht worden, sagte Menschenrechtsanwalt Terry Collingsworth von der Gruppe International Rights Advocates der Nachrichtenagentur Reuters.“
+
+Man sieht, dass sich beide lediglich durch die zwei Worte „am Donnerstag“ am Ende des ersten Satzes unterscheiden. Bei den folgenden Sätzen enthält der zweite Satz einen zusätzlichen Nebensatz am Ende, durch den sie sich unterscheiden.
+
+„Die Zivil-Polizisten verdeckten den 28-jährigen Russlanddeutschen, der am 1.Juli im Landgericht Dresden die Ägypterin Marwa el-Sherbini erstochen hat.“
+
+„Die Zivil-Polizisten verdeckten den 28-jährigen Russlanddeutschen, der am 1.Juli im Landgericht Dresden die Ägypterin Marwa el-Sherbini erstochen hat\textbf{, mit vollem Körpereinsatz}.“
+
+In der aktuellen Ergebnismenge wurden keine Fehler gefunden. Hier ist zu prüfen, ob sich bei größeren Datenmengen Fehler einschleichen. 
+
+\section{Einschränkungen}
+Es stellte sich heraus, dass es bei dieser großen Datenmenge nicht möglich ist alle Operationen im RAM auszuführen. Deshalb wurden alle Schritte auf die Festplatte ausgelagert, was zu einer deutlichen Verlangsamung des Skripts führte. Es stellte sich heraus, dass die Festplatte zum Flaschenhals wurde. Dies führt zu Einschränkungen in der Laufzeit. 
+
+Eine weitere Einschränkung liegt bezüglich der untersuchten Sätze vor. Es wird nach Sätzen mit mindestens 5 gemeinsamen seltenen Wörtern gesucht. Das setzt zugleich voraus, dass die Sätze mindestens 5 seltene Wörter enthalten. Dadurch werden vor allem kurze Sätze und Sätze mit wenigen seltenen Wörtern nicht beachtet. Setzt man die Grenze mit mindestens 5 gemeinsamen Wörtern herab, führt das zu einer Verschlechterung der Präzision. 
+
+\section{Erweiterungsmöglichkeiten}
+Um die benannten Einschränkungen zu beheben gibt es zwei Erweiterungsmöglichkeiten. Die erste Möglichkeit ist den Algorithmus auf einem Cluster von Rechnern laufen zu lassen. Durch die Verteilte Architektur sind deutliche Steigerungen in der Performance möglich. Damit sollte es möglich sein, den Größten Datensatz, mit ca. 250 Mio. Sätzen, in deutlich kürzerer Zeit zu verarbeiten.
+
+Außerdem wäre es möglich, Sätze mit weniger als 5 gemeinsamen Wörtern genauer auszuwerten. Diese Sätze werden geclustert. Man erhält Cluster mit Sätzen die zumindest zum selben Thema gehören. Nun müsste noch ein Algorithmus entwickelt werden um diese Cluster gezielt automatisch auszuwerten. 
 \end{document}
