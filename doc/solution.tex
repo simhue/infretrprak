@@ -1,0 +1,1077 @@
+\documentclass[a4paper,11pt,utf8]{scrartcl}
+
+\usepackage[ngerman]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, left=2cm, right=2cm, top=1.5cm, bottom=1.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{stmaryrd}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage[hidelinks]{hyperref}
+\usepackage[onehalfspacing]{setspace}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{tikz}
+
+\usetikzlibrary{shapes,arrows}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Python,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3
+}
+
+\setlength{\headsep}{.5cm}
+
+\begin{document}
+
+\pagestyle{empty}
+
+% Titlepage
+\noindent
+Fortgeschrittene Methoden des Information Retrieval \hfill Kevin Schramm, Simon Hüning \hfill 19.02.2017\vspace{-.4cm}\\
+\begin{center}
+\huge\textsf{Lösungsskizze}\vspace{.1cm}\\
+\large Seltene gemeinsame Wörter – semantisch ähnliche Sätze
+\end{center}
+
+\section{Projektbeschreibung}
+Das Ziel des Praktikums war es ein Programm zu entwickeln, welches ähnliche Sätze in einem Korpus identifiziert. Hierbei wurden zwei Ansätze verfolgt. Beim ersten Ansatz wurde davon ausgegangen, dass die Ähnlichkeit durch die Anzahl gemeinsamer seltene Wörter beschrieben wird. Beim zweiten Ansatz hingegen wurden die 5 seltensten Wörter jedes Satzes untersucht und miteinander verglichen. Hierbei wurden zum einen mehr ähnliche Sätze gefunden, zum anderen wurde die zu verarbeitende Datenmenge vergrößert wodurch, was einen größeren Rechenaufwand erforderte. 
+
+Ein besonderes Augenmerk der Praktikumsaufgabe lag auf der Verarbeitung von großen Korpora mit bis zu 100 Millionen Sätzen. Deshalb war eine hocheffiziente Programmierung notwendig. Zusätzlich zu den deutschen Korpora wurden noch englische Korpora verwendet und die Korrektheit des Programms getestet. 
+
+\section{Lösungsansatz}
+Zur Lösung des Problems wurde der Algorithmus \emph{Satzähnlichkeit fein} aus der Vorlesung Fortgeschrittene Methoden des Information Retrieval verwendet. Der Algorithmus soll in folgenden Schritten ablaufen.
+\begin{enumerate}
+	\item Inverse Liste der Quelldatenbank exportieren
+	\item Für jede Satz-ID eine Liste erstellen, die entsprechend zugehörige Wort-IDs enthalten
+	\item Für jede gesammelte Wort-ID aus dem vorherigen Schritt, eine Liste von Satz-IDs erzeugen, die diese Wort-ID gemeinsam enthalten
+	\item Liste der Satzpaare ermitteln, die gemeinsame Wörter haben und sortieren
+	\item Doppelte Satzpaare zählen und bei Überschreitung einer vorher festgelegten Schwelle persistieren
+\end{enumerate}
+
+Hierbei wurden einmal die häufigsten 87.839 Wörter ignoriert, um nur die seltensten zu betrachten. Beim zweiten Ansatz wurden für jeden Satz die häufigsten 5 Wörter ausgewählt. Dadurch das die Wörter in der Datenbank nach Häufigkeit sortiert vorliegen, handelte es sich hierbei um die fünf Wörter mit der höchsten ID.
+
+Der Vergleich der Sätze lief bei beiden Ansätzen gleich ab. Zuerst wurde aus jedem Satz ein Vektor erzeugt, der die IDs der in ihm vorkommenden Wörter enthält. Diese Vektoren wurden in einer Datei gespeichert. Aus diesen Satzvektoren wurden wiederum Wortvektoren gebildet. Die Wortvektoren wurden ebenfalls in einer Datei zwischengespeichert. Ein Wortvektor enthält die IDs aller Sätze in denen das Wort vorkommt. Anschließend wurden aus den Wortvektoren Satzpaare gebildet. Ein Satzpaar bedeutet, dass diese beiden Sätze, ein gemeinsames Wort besitzen. Die Satzpaare wurden in eine Datei geschrieben und sortiert. Nun werden die Paare gezählt, bei X Paaren, das heißt X gemeinsame Wörter, wird davon ausgegangen das es sich um ähnliche Sätze handelt. Die so gefundenen Satzpaare werden in eine Textdatei geschrieben und gespeichert. 
+
+Anfangs wurde versucht alle Schritte im RAM auszuführen. Das beschleunigte zwar den Algorithmus enorm, allerdings wird bei größeren Datenmengen schnell die Maximale Kapazität des RAMs erreicht und das Skript bricht ab. 
+
+\section{Einrichtung und Ausführung}
+Damit das Skript reibungslos laufen kann, muss ein Linuxbetriebssystem mit einem installiertem Python-2.7-Paket vorhanden sein. Die Dateien \texttt{run.sh} und \texttt{main.py} gemeinsam in einen beliebigen Ordner (z.B. das Home-Verzeichnis des aktuellen Benutzers) ablegen. Für den Export der inversen Liste werden Zugangsdaten für die MySQL-Zieldatenbank benötigt. Mit einem Texteditor \texttt{main.py} öffnen und in die Zeilen
+\begin{lstlisting}
+# DB connection information
+# DB host
+host = 'localhost'
+# DB user
+user = 'dbuser'
+# DB password
+passwd = 'password'
+# Name of used DB
+dbName = 'deu_mixed_2011'
+\end{lstlisting}
+die Daten der benutzten Datenbankverbindung eintragen. Optional können die Konfigurationsvariablen verändert werden.
+\begin{labeling}{alligator}
+	\item [\texttt{wordIdBoundary}] Jede Wort-ID, die kleiner oder gleich diesem Wert ist, wird ignoriert. Die Höhe wirkt wirkt sich auf die Endqualität und auf die Gesamtlaufzeit aus. Je höher dieser Wert ist, um so mehr potentielle Kandidaten werden ignoriert, aber die Laufzeit wird verringert.
+	\item [\texttt{countOfWords}] Die Anzahl der seltensten Wort-IDs pro Satz, die zum Vergleich benutzt werden. Die Sätze, die weniger Wörter besitzen als dieser Wert, werden ignoriert. Je höher dieser Wert ist, um so größer ist die Qualität der Ergebnisse, aber die Gesamtlaufzeit erhöht sich, da die Anzahl der Vergleiche steigt.
+	\item [\texttt{countOfSentences}] Die Anzahl der Sätze, die verarbeitet werden sollen. -1 zeigt an, dass alle Sätze in der Exportdatei verarbeitet werden.
+\end{labeling}
+Die Datei speichern und den Editor schließen. Ein Terminal öffnen und zum Verzeichnis navigieren in dem \texttt{run.sh} liegt. Das Skript wird mit dem Kommando \texttt{./run.sh} gestartet.
+
+Nachdem das Skript erfolgreich beendet ist, liegen in dem selben Verzeichnis drei neue Textdateien. Die Exportdatei (benannt nach dem Namen der Datenbank) beinhaltet alle Satz-ID/Wort-ID-Paare aus der inversen Liste. Wenn ein neuer Export erstellt werden soll, muss diese Datei gelöscht werden. In der Datei \texttt{sorted-counted-pairs} liegen aufsteigend sortiert die gezählten Satzpaare im Format 
+\begin{lstlisting}
+	AnzahlGemeinsamerWoerter Satz-ID1 Satz-ID2
+\end{lstlisting}
+. In der Datei \texttt{sentences.txt} sind die Satzpaare als Klartext zur Auswertung aufgelistet.
+
+\section{Implementierung}
+
+Das Programm wurde für Linuxsysteme konzipiert und wurde in einem Python- und Shellskript implementiert. Dieses Kapitel beschreibt die Implementierung der einzelnen Schritte, die in Kapitel 2 erläutert wurden. Die Herausforderung war die Implementation möglichst unabhängig von der Größe des Arbeitsspeichers durchzuführen. 
+
+\subsection{Export der inversen Liste}
+Für den Export wird eine SQL-Anfrage 
+\begin{lstlisting}[language=SQL]
+SELECT s_id, w_id FROM inv_w;
+\end{lstlisting} an die Datenbank geschickt. Das Ergebnis wird sortiert im Format \texttt{(s\char`_id,w\char`_id)} in eine Ausgabedatei geschrieben. Zur besseren Differenzierung der Exportdateien ist der Name der Ausgabedatei der selbe wie der Name der Datenbank.
+
+\subsection{Erstellung der Wortvektoren}
+\ifx\du\undefined
+  \newlength{\du}
+\fi
+\setlength{\du}{15\unitlength}
+\begin{figure}[!h]
+\center
+\resizebox{0.6\linewidth}{!}{
+\begin{tikzpicture}
+\pgftransformxscale{1.000000}
+\pgftransformyscale{-1.000000}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetlinewidth{0.100000\du}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\pgfpathmoveto{\pgfpoint{23.843100\du}{-2.071226\du}}
+\pgfpathlineto{\pgfpoint{25.705600\du}{-2.071226\du}}
+\pgfpathcurveto{\pgfpoint{25.962758\du}{-2.071226\du}}{\pgfpoint{26.171225\du}{-1.708411\du}}{\pgfpoint{26.171225\du}{-1.260855\du}}
+\pgfpathcurveto{\pgfpoint{26.171225\du}{-0.813299\du}}{\pgfpoint{25.962758\du}{-0.450483\du}}{\pgfpoint{25.705600\du}{-0.450483\du}}
+\pgfpathlineto{\pgfpoint{23.843100\du}{-0.450483\du}}
+\pgfpathcurveto{\pgfpoint{23.585943\du}{-0.450483\du}}{\pgfpoint{23.377475\du}{-0.813299\du}}{\pgfpoint{23.377475\du}{-1.260855\du}}
+\pgfpathcurveto{\pgfpoint{23.377475\du}{-1.708411\du}}{\pgfpoint{23.585943\du}{-2.071226\du}}{\pgfpoint{23.843100\du}{-2.071226\du}}
+\pgfusepath{fill}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\pgfpathmoveto{\pgfpoint{23.843100\du}{-2.071226\du}}
+\pgfpathlineto{\pgfpoint{25.705600\du}{-2.071226\du}}
+\pgfpathcurveto{\pgfpoint{25.962758\du}{-2.071226\du}}{\pgfpoint{26.171225\du}{-1.708411\du}}{\pgfpoint{26.171225\du}{-1.260855\du}}
+\pgfpathcurveto{\pgfpoint{26.171225\du}{-0.813299\du}}{\pgfpoint{25.962758\du}{-0.450483\du}}{\pgfpoint{25.705600\du}{-0.450483\du}}
+\pgfpathlineto{\pgfpoint{23.843100\du}{-0.450483\du}}
+\pgfpathcurveto{\pgfpoint{23.585943\du}{-0.450483\du}}{\pgfpoint{23.377475\du}{-0.813299\du}}{\pgfpoint{23.377475\du}{-1.260855\du}}
+\pgfpathcurveto{\pgfpoint{23.377475\du}{-1.708411\du}}{\pgfpoint{23.585943\du}{-2.071226\du}}{\pgfpoint{23.843100\du}{-2.071226\du}}
+\pgfusepath{stroke}
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,-1.060855\du){Start};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (21.139350\du,6.903127\du)--(21.139350\du,9.603127\du)--(28.409350\du,9.603127\du)--(28.409350\du,6.903127\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (21.139350\du,6.903127\du)--(21.139350\du,9.603127\du)--(28.409350\du,9.603127\du)--(28.409350\du,6.903127\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,8.048127\du){Hole nächste Zeile };
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,8.848127\du){aus Export};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (24.774350\du,43.745608\du)--(30.451261\du,46.584063\du)--(24.774350\du,49.422518\du)--(19.097440\du,46.584063\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,43.745608\du)--(30.451261\du,46.584063\du)--(24.774350\du,49.422518\du)--(19.097440\du,46.584063\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,45.979063\du){nächste};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,46.779063\du){Zeile};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,47.579063\du){existiert?};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (24.774350\du,12.515641\du)--(31.018761\du,15.637846\du)--(24.774350\du,18.760051\du)--(18.529940\du,15.637846\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,12.515641\du)--(31.018761\du,15.637846\du)--(24.774350\du,18.760051\du)--(18.529940\du,15.637846\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,15.032846\du){w\_id};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,15.832846\du){\textless=};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,16.632846\du){wordIdBoundary};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (24.774350\du,20.943315\du)--(29.703761\du,23.408020\du)--(24.774350\du,25.872725\du)--(19.844940\du,23.408020\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,20.943315\du)--(29.703761\du,23.408020\du)--(24.774350\du,25.872725\du)--(19.844940\du,23.408020\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,23.203020\du){Hat sich s\_id };
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,24.003020\du){verändert?};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (7.697617\du,6.887384\du)--(14.492470\du,6.887384\du)--(13.509750\du,9.587384\du)--(6.714898\du,9.587384\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (7.697617\du,6.887384\du)--(14.492470\du,6.887384\du)--(13.509750\du,9.587384\du)--(6.714898\du,9.587384\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (10.603684\du,8.032384\du){Schreibe Vektor};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (10.603684\du,8.832384\du){in Datei};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (21.681850\du,28.496158\du)--(21.681850\du,31.196158\du)--(27.866850\du,31.196158\du)--(27.866850\du,28.496158\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (21.681850\du,28.496158\du)--(21.681850\du,31.196158\du)--(27.866850\du,31.196158\du)--(27.866850\du,28.496158\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,29.641158\du){sortiere w\_id};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,30.441158\du){in Vektor ein};
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.755600\du,2.326112\du)--(20.755600\du,4.226112\du)--(28.793100\du,4.226112\du)--(28.793100\du,2.326112\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,3.471112\du){Erstelle leeren Vektor};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (21.498100\du,40.604923\du)--(21.498100\du,42.504923\du)--(28.050600\du,42.504923\du)--(28.050600\du,40.604923\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (21.498100\du,40.604923\du)--(21.498100\du,42.504923\du)--(28.050600\du,42.504923\du)--(28.050600\du,40.604923\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,41.749923\du){Lösche Vektor\ensuremath{[}0\ensuremath{]}};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (24.774350\du,33.072362\du)--(30.907465\du,35.924418\du)--(24.774350\du,38.776474\du)--(18.641236\du,35.924418\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,33.072362\du)--(30.907465\du,35.924418\du)--(24.774350\du,38.776474\du)--(18.641236\du,35.924418\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,35.319418\du){Vektor.length};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,36.119418\du){\textgreater};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,36.919418\du){countOfWords};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (10.103643\du,20.692585\du)--(16.495594\du,23.638540\du)--(10.103643\du,26.584495\du)--(3.711692\du,23.638540\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (10.103643\du,20.692585\du)--(16.495594\du,23.638540\du)--(10.103643\du,26.584495\du)--(3.711692\du,23.638540\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (10.103643\du,23.033540\du){len(Vektor)};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (10.103643\du,23.833540\du){\textless};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (10.103643\du,24.633540\du){countOfWords};
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetlinewidth{0.100000\du}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (21.939975\du,51.400555\du)--(21.939975\du,53.400555\du)--(27.608725\du,53.400555\du)--(27.608725\du,51.400555\du)--cycle;
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (21.939975\du,51.400555\du)--(21.939975\du,53.400555\du)--(27.608725\du,53.400555\du)--(27.608725\du,51.400555\du)--cycle;
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (22.506850\du,51.400555\du)--(22.506850\du,53.400555\du);
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (27.041850\du,51.400555\du)--(27.041850\du,53.400555\du);
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,52.200555\du){Erstelle};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (24.774350\du,53.000555\du){Satzvektoren};
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,9.603127\du)--(24.774350\du,10.960755\du)--(24.774350\du,10.960755\du)--(24.774350\du,12.515641\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,18.760051\du)--(24.774350\du,19.816135\du)--(24.774350\du,19.816135\du)--(24.774350\du,20.943315\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,25.872725\du)--(24.774350\du,26.870075\du)--(24.774350\du,26.870075\du)--(24.774350\du,28.496158\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,31.196158\du)--(24.774350\du,32.103358\du)--(24.774350\du,32.103358\du)--(24.774350\du,33.072362\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,38.776474\du)--(24.774350\du,39.778396\du)--(24.774350\du,39.778396\du)--(24.774350\du,40.604923\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,42.504923\du)--(24.774350\du,43.413114\du)--(24.774350\du,43.413114\du)--(24.774350\du,43.745608\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,49.422518\du)--(24.774350\du,49.851402\du)--(24.774350\du,49.851402\du)--(24.774350\du,51.400555\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (10.103643\du,20.692585\du)--(10.103643\du,18.664659\du)--(10.112324\du,18.664659\du)--(10.112324\du,9.587384\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (11.095044\du,6.887384\du)--(11.095044\du,3.276112\du)--(20.755600\du,3.276112\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (19.844940\du,23.408020\du)--(17.487125\du,23.408020\du)--(17.487125\du,23.638540\du)--(16.495594\du,23.638540\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (30.451261\du,46.584063\du)--(37.614031\du,46.584063\du)--(37.614031\du,3.276112\du)--(28.793100\du,3.276112\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.808309\du,-0.358783\du)--(24.808309\du,0.983664\du)--(24.774350\du,0.983664\du)--(24.774350\du,2.326112\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (24.774350\du,4.226112\du)--(24.774350\du,5.252272\du)--(24.774350\du,5.252272\du)--(24.774350\du,6.855267\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (3.711692\du,23.638540\du)--(3.711692\du,3.261472\du)--(11.124490\du,3.261472\du)--(11.124490\du,3.289818\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (18.641236\du,35.924418\du)--(16.234154\du,35.924418\du)--(16.234154\du,46.584063\du)--(19.097440\du,46.584063\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (31.018761\du,15.637846\du)--(31.018761\du,3.318319\du)--(28.793100\du,3.318319\du)--(28.793100\du,3.276112\du);
+}}
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (25.133995\du,39.667671\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (17.384133\du,38.717688\du){};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (17.704127\du,24.262956\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (32.488864\du,46.112566\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (31.323885\du,11.913176\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (4.109370\du,15.263116\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (16.429150\du,40.712663\du){falsch};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (10.669253\du,15.113119\du){falsch};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (25.468989\du,19.863034\du){falsch};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (25.603987\du,27.312901\du){falsch};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (25.488989\du,50.262492\du){falsch};
+\end{tikzpicture}
+}
+\end{figure}
+Ein Wortvektor ist eine Liste von Wort-IDs, die in Relation zu einer Satz-ID stehen. Da im vorhergehenden Schritt die Exportdatei sortiert wird, kann in einem Arbeitsschritt sukzessiv jedes Satz-Wort-ID-Paar mit gleicher Satz-ID ausgelesen und formatiert werden. Nachdem der Erstellung eines Wortvektors speichert das Programm diesen im Format \texttt{\{"key": s\_id, "items":[w\_id\_1, \dots, w\_id\_n]\}} in einer temporäre Auslagerungsdatei ab. Die sortierte Exportdatei bietet den weiteren Vorteil, dass neue Wortvektoren an die Datei angehängt werden können. Das sorgt für eine vergleichsweise schnelle Teillaufzeit.
+
+\subsection{Satzvektor erstellen}
+\begin{figure}[!h]
+\center
+\resizebox{0.6\linewidth}{!}{
+\begin{tikzpicture}
+\pgftransformxscale{1.000000}
+\pgftransformyscale{-1.000000}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetlinewidth{0.100000\du}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\pgfpathmoveto{\pgfpoint{19.504475\du}{3.400000\du}}
+\pgfpathlineto{\pgfpoint{21.366975\du}{3.400000\du}}
+\pgfpathcurveto{\pgfpoint{21.624133\du}{3.400000\du}}{\pgfpoint{21.832600\du}{3.847715\du}}{\pgfpoint{21.832600\du}{4.400000\du}}
+\pgfpathcurveto{\pgfpoint{21.832600\du}{4.952285\du}}{\pgfpoint{21.624133\du}{5.400000\du}}{\pgfpoint{21.366975\du}{5.400000\du}}
+\pgfpathlineto{\pgfpoint{19.504475\du}{5.400000\du}}
+\pgfpathcurveto{\pgfpoint{19.247317\du}{5.400000\du}}{\pgfpoint{19.038850\du}{4.952285\du}}{\pgfpoint{19.038850\du}{4.400000\du}}
+\pgfpathcurveto{\pgfpoint{19.038850\du}{3.847715\du}}{\pgfpoint{19.247317\du}{3.400000\du}}{\pgfpoint{19.504475\du}{3.400000\du}}
+\pgfusepath{fill}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\pgfpathmoveto{\pgfpoint{19.504475\du}{3.400000\du}}
+\pgfpathlineto{\pgfpoint{21.366975\du}{3.400000\du}}
+\pgfpathcurveto{\pgfpoint{21.624133\du}{3.400000\du}}{\pgfpoint{21.832600\du}{3.847715\du}}{\pgfpoint{21.832600\du}{4.400000\du}}
+\pgfpathcurveto{\pgfpoint{21.832600\du}{4.952285\du}}{\pgfpoint{21.624133\du}{5.400000\du}}{\pgfpoint{21.366975\du}{5.400000\du}}
+\pgfpathlineto{\pgfpoint{19.504475\du}{5.400000\du}}
+\pgfpathcurveto{\pgfpoint{19.247317\du}{5.400000\du}}{\pgfpoint{19.038850\du}{4.952285\du}}{\pgfpoint{19.038850\du}{4.400000\du}}
+\pgfpathcurveto{\pgfpoint{19.038850\du}{3.847715\du}}{\pgfpoint{19.247317\du}{3.400000\du}}{\pgfpoint{19.504475\du}{3.400000\du}}
+\pgfusepath{stroke}
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,4.600000\du){Start};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (17.289475\du,7.468754\du)--(17.289475\du,10.168754\du)--(23.581975\du,10.168754\du)--(23.581975\du,7.468754\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (17.289475\du,7.468754\du)--(17.289475\du,10.168754\du)--(23.581975\du,10.168754\du)--(23.581975\du,7.468754\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,8.613754\du){Hole nächsten};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,9.413754\du){Wortvektor (wv)};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (17.080725\du,12.800000\du)--(17.080725\du,16.300000\du)--(23.790725\du,16.300000\du)--(23.790725\du,12.800000\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (17.080725\du,12.800000\du)--(17.080725\du,16.300000\du)--(23.790725\du,16.300000\du)--(23.790725\du,12.800000\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,14.345000\du){Hole nächsten};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,15.145000\du){Satzvektor (sv)};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (20.435725\du,34.700000\du)--(25.404905\du,36.933156\du)--(20.435725\du,39.166311\du)--(15.466545\du,36.933156\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,34.700000\du)--(25.404905\du,36.933156\du)--(20.435725\du,39.166311\du)--(15.466545\du,36.933156\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,36.728156\du){Ist letzter };
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,37.528156\du){Satzvektor?};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (20.435725\du,40.512795\du)--(25.210135\du,42.900000\du)--(20.435725\du,45.287205\du)--(15.661315\du,42.900000\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,40.512795\du)--(25.210135\du,42.900000\du)--(20.435725\du,45.287205\du)--(15.661315\du,42.900000\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,42.695000\du){Ist letzter};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,43.495000\du){Wortvektor?};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (20.435725\du,18.716545\du)--(25.602635\du,21.300000\du)--(20.435725\du,23.883455\du)--(15.268815\du,21.300000\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,18.716545\du)--(25.602635\du,21.300000\du)--(20.435725\du,23.883455\du)--(15.268815\du,21.300000\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,21.095000\du){Ist sv\_w\_id};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,21.895000\du){in Wortvektor?};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (16.433225\du,25.550000\du)--(16.433225\du,28.250000\du)--(24.438225\du,28.250000\du)--(24.438225\du,25.550000\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (16.433225\du,25.550000\du)--(16.433225\du,28.250000\du)--(24.438225\du,28.250000\du)--(24.438225\du,25.550000\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,26.695000\du){Erweitere Satzvektor};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,27.495000\du){um wv\_s\_id };
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetlinewidth{0.100000\du}
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (16.602913\du,47.377818\du)--(16.602913\du,49.377818\du)--(24.268538\du,49.377818\du)--(24.268538\du,47.377818\du)--cycle;
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (16.602913\du,47.377818\du)--(16.602913\du,49.377818\du)--(24.268538\du,49.377818\du)--(24.268538\du,47.377818\du)--cycle;
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (17.369475\du,47.377818\du)--(17.369475\du,49.377818\du);
+\pgfsetbuttcap
+\pgfsetmiterjoin
+\pgfsetdash{}{0pt}
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (23.501975\du,47.377818\du)--(23.501975\du,49.377818\du);
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,48.577818\du){Erstelle Satzpaare};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (27.755000\du,25.800000\du)--(27.755000\du,28.500000\du)--(33.745000\du,28.500000\du)--(33.745000\du,25.800000\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (27.755000\du,25.800000\du)--(27.755000\du,28.500000\du)--(33.745000\du,28.500000\du)--(33.745000\du,25.800000\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (30.750000\du,26.945000\du){Erzeuge neuen};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (30.750000\du,27.745000\du){Satzvektor};
+\definecolor{dialinecolor}{rgb}{1.000000, 1.000000, 1.000000}
+\pgfsetfillcolor{dialinecolor}
+\fill (17.834659\du,29.950000\du)--(24.019511\du,29.950000\du)--(23.036791\du,32.650000\du)--(16.851939\du,32.650000\du)--cycle;
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (17.834659\du,29.950000\du)--(24.019511\du,29.950000\du)--(23.036791\du,32.650000\du)--(16.851939\du,32.650000\du)--cycle;
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,31.095000\du){Schreibe sv in};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node at (20.435725\du,31.895000\du){Datei};
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (15.363787\du,36.892003\du)--(13.531172\du,36.892003\du)--(13.531172\du,14.550000\du)--(17.080725\du,14.550000\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.594680\du,16.349756\du)--(20.594680\du,17.533150\du)--(20.435725\du,17.533150\du)--(20.435725\du,18.716545\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,23.883455\du)--(20.435725\du,24.959845\du)--(20.435725\du,24.959845\du)--(20.435725\du,25.550000\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,28.250000\du)--(20.435725\du,29.100000\du)--(20.927085\du,29.100000\du)--(20.927085\du,29.950000\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (19.944365\du,32.650000\du)--(19.944365\du,33.675000\du)--(20.435725\du,33.675000\du)--(20.435725\du,34.700000\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,39.166311\du)--(20.435725\du,40.306158\du)--(20.435725\du,40.306158\du)--(20.435725\du,40.512795\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,45.287205\du)--(20.435725\du,46.276504\du)--(20.435725\du,46.276504\du)--(20.435725\du,47.377818\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (15.661315\du,42.900000\du)--(10.922497\du,42.900000\du)--(10.922497\du,8.818754\du)--(17.289475\du,8.818754\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (25.602635\du,21.300000\du)--(25.602635\du,21.291199\du)--(30.750000\du,21.291199\du)--(30.750000\du,25.800000\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (30.672111\du,28.385338\du)--(30.672111\du,29.167669\du)--(20.927085\du,29.167669\du)--(20.927085\du,29.950000\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,5.400000\du)--(20.435725\du,6.434377\du)--(20.435725\du,6.434377\du)--(20.435725\du,7.468754\du);
+}}
+\pgfsetlinewidth{0.100000\du}
+\pgfsetdash{}{0pt}
+\pgfsetdash{}{0pt}
+\pgfsetmiterjoin
+\pgfsetbuttcap
+{
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetfillcolor{dialinecolor}
+% was here!!!
+\pgfsetarrowsend{stealth}
+{\pgfsetcornersarced{\pgfpoint{0.000000\du}{0.000000\du}}\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\draw (20.435725\du,10.168754\du)--(20.435725\du,11.484377\du)--(20.435725\du,11.484377\du)--(20.435725\du,12.800000\du);
+}}
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (20.943322\du,39.753596\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (21.267065\du,45.982573\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (21.128318\du,24.876183\du){wahr};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (13.993349\du,29.290866\du){falsch};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (11.050227\du,26.642057\du){falsch};
+% setfont left to latex
+\definecolor{dialinecolor}{rgb}{0.000000, 0.000000, 0.000000}
+\pgfsetstrokecolor{dialinecolor}
+\node[anchor=west] at (31.315724\du,23.614845\du){falsch};
+\end{tikzpicture}
+
+}
+\end{figure}
+
+Um Satzpaare bilden zu können, sind Satzvektoren nötig. Satzvektoren sind Listen von Satz-IDs, die mit einer gemeinsamen Wort-ID in Relation stehen. Die Wortvektordatei wird zeilenweise ausgelesen und in Satzvektoren formatiert. Die Satzvektoren werden im Format \texttt{\{"key": w\_id, "items":[s\_id\_1, \dots, s\_id\_n]\}} in eine weitere temporäre Datei ausgelagert. Für jeden neuen Wortvektor ist es nötig, die temporäre Datei erneut durch zu iterieren. Dadurch wird überprüft, ob eine Wort-ID schon vorkam. Für den positiven Fall wird der entsprechenden Satzvektor mit der Satz-ID des Wortvektors erweitert. Im negativen Fall wird ein neuer Satzvektor erzeugt und der Satzvektordatei angefügt. Das wiederholte Iterieren der Auslagerungsdatei ist zeitintensiv. 
+
+Um die Laufzeit zu minimieren wäre es denkbar für jeden Satzvektor eine eigene temporäre Datei zu erzeugen. Der Name der Datei enthält die Wort-ID und der Inhalt der Datei sind die entsprechenden Satz-IDs. Dadurch werden die Dateigrößen und die Lese-/Schreibzeiten klein gehalten. Dieser Ansatz könnte jedoch durch die \emph{Inodes} des Linuxsystems limitiert sein, da die Anzahl der Inodes auf einem System begrenzt ist und die Anzahl der Sätze, die verglichen werden sollen, nicht vorhersagbar ist. Wenn dieser Schritt vollendet ist, wird die jetzt obsolete Wortvektordatei gelöscht.
+
+\subsection{Satzpaare ermitteln}
+Für jedes Satzvektor wird jede Satz-ID mit jeder übrigen Satz-ID gepaart und in eine Auslagerungsdatei geschrieben. Dabei wird auf eine aufsteigende Reihenfolge der Paare geachtet. So erzeugt zum Beispiel der Satzvektor \texttt{w\_id:[s\_id\_1, s\_id\_2, s\_id\_3]} die Paare \texttt{s\_id\_1 s\_id\_2, s\_id\_1 s\_id\_3, s\_id\_2 s\_id\_3}. Wenn ein Satzvektor nur eine Satz-ID enthält, wird dieser verworfen. Am Ende des Schrittes wird die Satzvektordatei gelöscht.
+
+\subsection{Satzpaare sortieren und Duplikate zählen}
+Zur Sortierung und Zählung der Paare stellt Linux systemeigene Befehle zur Verfügung. \texttt{sort --parallel=3 -o sorted-pairs pairs} sortiert zeilenweise die Satzpaare aufsteigend. Zur schnelleren Sortierung kann mit \texttt{--parallel=$n$} die Sortierung auf $n$ Prozessorkerne (in diesem Fall drei Kerne) verteilt werden. \texttt{uniq -d -c} zählt die doppelten Paare und entfernt einzeln vorkommende Satzpaare. Anschließend sortiert ein erneuter \texttt{sort}-Aufruf die Zählungen der Aanzahl der Dopplungen nach und gibt alles in die Datei \texttt{sorted-counted-pairs} aus. Als letzter Schritt werden für jedes Paar mittels SQL-Abfrage der eigentliche Sätze als Klartext aus der Datenbank gelesen und in der Datei \texttt{sentences.txt} abgespeichert.
+
+\end{document}
