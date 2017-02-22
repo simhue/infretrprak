@@ -1,7 +1,7 @@
 # infretrprak
 Projekt für die Veranstaltung Fortgeschrittene Methoden des Information Retrieval http://asv.informatik.uni-leipzig.de/de/courses/215
 
-Das Projekt beinhaltet die Entwicklung eines Programms, welches die semantische Ähnlichkeit aus einer Menge von Sätzen vergleicht.
+Das Projekt beinhaltet die Entwicklung eines Programms, welches die semantische Ähnlichkeit aus einer Menge von Sätzen vergleicht. Die Sätze werden anhand ihrer gemeinsamen, seltenen Wörter verglichen.
 
 # Anleitung
 
